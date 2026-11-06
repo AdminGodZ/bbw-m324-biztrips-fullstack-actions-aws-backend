@@ -10,6 +10,7 @@ RUN addgroup -g 10001 app && adduser -D -u 10001 -G app app
 WORKDIR /app
 RUN mkdir uploads && chown app:app uploads
 COPY --from=build /build/target/*.jar app.jar
+COPY deploy/rds-ca-bundle.crt /app/rds-ca-bundle.crt
 USER app
 ENV APP_STORAGE_LOCATION=/app/uploads
 VOLUME ["/app/uploads"]
