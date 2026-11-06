@@ -1,0 +1,318 @@
+{
+  "observedAt": "2026-11-06T07:58:50.723394+00:00",
+  "stackStatus": "CREATE_COMPLETE",
+  "outputs": {
+    "BackendEcr": "bbw-m324-biztrips-refcard03-04-backend",
+    "TaskSecurityGroup": "sg-0783488f91da0805f",
+    "DBSecretArn": "arn:aws:secretsmanager:us-east-1:471112806058:secret:DbSecret-wheSAe1gvnFo-ppoezF",
+    "FrontendTarget": "arn:aws:elasticloadbalancing:us-east-1:471112806058:targetgroup/bbw-m3-Front-IAEXICTXBHGX/1132031d1e0e2da9",
+    "BackendTarget": "arn:aws:elasticloadbalancing:us-east-1:471112806058:targetgroup/bbw-m3-Backe-LYGHMBTVGPNV/453bb26c21d8de93",
+    "RoleArn": "arn:aws:iam::471112806058:role/LabRole",
+    "TaskSubnets": "subnet-05b72cb48e661a103,subnet-0d9ae5483d59415cf",
+    "FrontendEcr": "bbw-m324-biztrips-refcard03-04-frontend",
+    "Endpoint": "http://bbw-m324-Alb-BD6YtmTDd85r-713603972.us-east-1.elb.amazonaws.com",
+    "LogGroup": "/ecs/bbw-m324-biztrips-refcard03-04",
+    "ClusterName": "bbw-m324-biztrips-refcard03-04",
+    "DBEndpoint": "bbw-m324-biztrips-refcard03-04-database-bftrnle7sufj.c3kmi4mq65tu.us-east-1.rds.amazonaws.com",
+    "Ec2Host": "13.220.4.150"
+  },
+  "services": [
+    {
+      "name": "biztrips-backend",
+      "runningCount": 2,
+      "desiredCount": 2,
+      "taskDefinition": "arn:aws:ecs:us-east-1:471112806058:task-definition/bbw-m324-biztrips-backend:3",
+      "rolloutState": "COMPLETED",
+      "tasks": [
+        {
+          "arn": "arn:aws:ecs:us-east-1:471112806058:task/bbw-m324-biztrips-refcard03-04/b9d44b5f3f8042fc8952f2510b234439",
+          "health": "HEALTHY",
+          "startedAt": "2026-11-06T08:47:52.956000+01:00",
+          "images": [
+            {
+              "image": "471112806058.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-biztrips-refcard03-04-backend:9771cc5b627bbbd7f98be303e088e4cc8d46f745",
+              "digest": "sha256:423db15a0ad791a7a4a521c13dba1b0996459b8f4adae39f94da0805e66d5290"
+            }
+          ]
+        },
+        {
+          "arn": "arn:aws:ecs:us-east-1:471112806058:task/bbw-m324-biztrips-refcard03-04/cfd5eab4e2f7418d9c1ebc66bb73629a",
+          "health": "HEALTHY",
+          "startedAt": "2026-11-06T08:48:26.317000+01:00",
+          "images": [
+            {
+              "image": "471112806058.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-biztrips-refcard03-04-backend:9771cc5b627bbbd7f98be303e088e4cc8d46f745",
+              "digest": "sha256:423db15a0ad791a7a4a521c13dba1b0996459b8f4adae39f94da0805e66d5290"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "biztrips-frontend",
+      "runningCount": 2,
+      "desiredCount": 2,
+      "taskDefinition": "arn:aws:ecs:us-east-1:471112806058:task-definition/bbw-m324-biztrips-frontend:3",
+      "rolloutState": "COMPLETED",
+      "tasks": [
+        {
+          "arn": "arn:aws:ecs:us-east-1:471112806058:task/bbw-m324-biztrips-refcard03-04/1ccf6d8dab1a42e981103d6a9e322425",
+          "health": "HEALTHY",
+          "startedAt": "2026-11-06T08:47:45.204000+01:00",
+          "images": [
+            {
+              "image": "471112806058.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-biztrips-refcard03-04-frontend:965c5583192eeb3a43d3c38564c5a075fe8fa743",
+              "digest": "sha256:9c7753f82f3625d643c57eb3e7943e140e48c9e09e9a560cf3b1d08e68baebd8"
+            }
+          ]
+        },
+        {
+          "arn": "arn:aws:ecs:us-east-1:471112806058:task/bbw-m324-biztrips-refcard03-04/1f3a438104834b0a9935082957baaa6d",
+          "health": "HEALTHY",
+          "startedAt": "2026-11-06T08:48:23.368000+01:00",
+          "images": [
+            {
+              "image": "471112806058.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-biztrips-refcard03-04-frontend:965c5583192eeb3a43d3c38564c5a075fe8fa743",
+              "digest": "sha256:9c7753f82f3625d643c57eb3e7943e140e48c9e09e9a560cf3b1d08e68baebd8"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "workflows": {
+    "backend": {
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "9771cc5b627bbbd7f98be303e088e4cc8d46f745",
+      "url": "https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-actions-aws-backend/actions/runs/42182939634",
+      "jobs": [
+        {
+          "name": "test",
+          "conclusion": "success"
+        },
+        {
+          "name": "build",
+          "conclusion": "success"
+        },
+        {
+          "name": "deploy-ecs",
+          "conclusion": "success"
+        },
+        {
+          "name": "deploy-ec2",
+          "conclusion": "success"
+        },
+        {
+          "name": "docker",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "frontend": {
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "965c5583192eeb3a43d3c38564c5a075fe8fa743",
+      "url": "https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-actions-aws-frontend/actions/runs/42182874967",
+      "jobs": [
+        {
+          "name": "test",
+          "conclusion": "success"
+        },
+        {
+          "name": "build",
+          "conclusion": "success"
+        },
+        {
+          "name": "deploy-ec2",
+          "conclusion": "success"
+        },
+        {
+          "name": "docker",
+          "conclusion": "success"
+        },
+        {
+          "name": "deploy-ecs",
+          "conclusion": "success"
+        }
+      ]
+    }
+  },
+  "dockerHub": {
+    "backend": [
+      {
+        "tag": "latest",
+        "digest": "sha256:7df27e7e1d0f83325c79ebeca485a4ee37599983f6d7e4876b7d5df0b93a50e0",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      },
+      {
+        "tag": "9771cc5b627bbbd7f98be303e088e4cc8d46f745",
+        "digest": "sha256:7df27e7e1d0f83325c79ebeca485a4ee37599983f6d7e4876b7d5df0b93a50e0",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      },
+      {
+        "tag": "prod01",
+        "digest": "sha256:7df27e7e1d0f83325c79ebeca485a4ee37599983f6d7e4876b7d5df0b93a50e0",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      }
+    ],
+    "frontend": [
+      {
+        "tag": "latest",
+        "digest": "sha256:d2d63210bdabea777dd7e6b56cdfe672bc684a8f3a5c1a0cf25d0f9d734f7a9b",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      },
+      {
+        "tag": "965c5583192eeb3a43d3c38564c5a075fe8fa743",
+        "digest": "sha256:d2d63210bdabea777dd7e6b56cdfe672bc684a8f3a5c1a0cf25d0f9d734f7a9b",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      },
+      {
+        "tag": "prod01",
+        "digest": "sha256:d2d63210bdabea777dd7e6b56cdfe672bc684a8f3a5c1a0cf25d0f9d734f7a9b",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      },
+      {
+        "tag": "95ab17b74ced0c684a69059449d4b032ef453628",
+        "digest": "sha256:65bbd5620babc54c09f89ab3d9c1b0245d5589213efb557c5a35b374b7d1a8f4",
+        "platforms": [
+          {
+            "os": "linux",
+            "architecture": "amd64"
+          },
+          {
+            "os": "linux",
+            "architecture": "arm64"
+          }
+        ]
+      }
+    ]
+  },
+  "BackendTarget": [
+    {
+      "target": {
+        "Id": "172.31.81.43",
+        "Port": 8080,
+        "AvailabilityZone": "us-east-1b"
+      },
+      "health": "healthy"
+    },
+    {
+      "target": {
+        "Id": "172.31.8.242",
+        "Port": 8080,
+        "AvailabilityZone": "us-east-1a"
+      },
+      "health": "healthy"
+    }
+  ],
+  "FrontendTarget": [
+    {
+      "target": {
+        "Id": "172.31.12.171",
+        "Port": 80,
+        "AvailabilityZone": "us-east-1a"
+      },
+      "health": "healthy"
+    },
+    {
+      "target": {
+        "Id": "172.31.86.97",
+        "Port": 80,
+        "AvailabilityZone": "us-east-1b"
+      },
+      "health": "healthy"
+    }
+  ],
+  "database": {
+    "DBInstanceIdentifier": "bbw-m324-biztrips-refcard03-04-database-bftrnle7sufj",
+    "DBInstanceStatus": "available",
+    "Engine": "mariadb",
+    "EngineVersion": "11.8.9",
+    "PubliclyAccessible": false,
+    "StorageEncrypted": true,
+    "DBInstanceClass": "db.t3.micro"
+  },
+  "ec2Ingress": [
+    {
+      "IpProtocol": "tcp",
+      "FromPort": 80,
+      "ToPort": 80,
+      "UserIdGroupPairs": [],
+      "IpRanges": [
+        {
+          "CidrIp": "0.0.0.0/0"
+        }
+      ],
+      "Ipv6Ranges": [],
+      "PrefixListIds": []
+    },
+    {
+      "IpProtocol": "tcp",
+      "FromPort": 22,
+      "ToPort": 22,
+      "UserIdGroupPairs": [],
+      "IpRanges": [
+        {
+          "CidrIp": "212.104.214.109/32"
+        }
+      ],
+      "Ipv6Ranges": [],
+      "PrefixListIds": []
+    }
+  ]
+}

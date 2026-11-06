@@ -1,0 +1,24 @@
+{
+  "observedAt": "2026-11-06T07:57:21.966749+00:00",
+  "checks": {
+    "local": {
+      "url": "http://127.0.0.1:3000",
+      "apiStatus": 200,
+      "tripCount": 3,
+      "photoSHA256": "4c5d573cfb85b8ab0a5659062b830a058d1a449e51a6d79c13b483a77ea7ed28",
+      "photoContentType": "image/png"
+    },
+    "ec2": {
+      "url": "http://13.220.4.150",
+      "apiStatus": 200,
+      "tripCount": 3,
+      "photoSHA256": "4c5d573cfb85b8ab0a5659062b830a058d1a449e51a6d79c13b483a77ea7ed28",
+      "photoContentType": "image/png"
+    },
+    "ecs": {
+      "url": "http://bbw-m324-Alb-BD6YtmTDd85r-713603972.us-east-1.elb.amazonaws.com",
+      "apiStatus": 200,
+      "tripCount": 3
+    }
+  }
+}

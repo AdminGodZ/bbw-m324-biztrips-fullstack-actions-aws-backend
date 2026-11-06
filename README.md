@@ -41,6 +41,13 @@ Das eigene Infrastruktur-Template liegt in `deploy/infrastructure.json`. Es verw
 
 Credentials laufen mit der Lab-Session ab. Vor einem neuen Pipeline-Lauf den ganzen `AWS_CREDENTIALS`-Block in beiden Repositories erneuern. Keine Credentials in Dateien committen oder in Logs ausgeben.
 
+## Abgenommene Anwendung
+
+- EC2: http://13.220.4.150
+- ECS: http://bbw-m324-Alb-BD6YtmTDd85r-713603972.us-east-1.elb.amazonaws.com
+- Beide Pipelines sind vollständig grün. ECS betreibt je zwei gesunde Backend- und Frontend-Tasks.
+- `task-definition.json` dokumentiert die tatsächlich registrierte Revision; `deploy/ecs-deploy.py` rendert die nächsten Revisionen aus der Infrastruktur.
+
 ## Nachweise
 
 [Umsetzung, Prüfstand und Reflexion](docs/NACHWEIS.md). Die originalen Aufgaben bleiben unter `docs/exercises`; die ursprüngliche README liegt unter `docs/UPSTREAM-README.md`.

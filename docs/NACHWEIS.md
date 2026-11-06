@@ -12,12 +12,14 @@ Die Historie bleibt erhalten; die Lehrer-Repositories sind als `upstream` einget
 
 | Übung | Implementierung | Bisher tatsächlich geprüft |
 |---|---|---|
-| EX-01 · EC2 und GitHub Actions | Getrennte Jobs für Test, Build und Deployment; Artefakte; gepinnter SSH-Hostkey; Healthcheck; Backend-Rollback; native MariaDB und systemd | Lokale Builds und Skript-Syntax; Live-Pipeline und EC2-Abnahme stehen noch aus |
-| EX-02 · Docker Hub | Zwei Multi-Stage-Images; Tags `prod01`, `latest`, Commit-SHA; Veröffentlichung nur auf `main`; Buildx-Cache | Beide Images gebaut; Container laufen lokal; Veröffentlichung und erneuter Pull stehen noch aus |
-| EX-03 · ECR, ECS, ALB, RDS | Infrastruktur als CloudFormation; private DB; zwei Services mit je zwei Tasks; Healthchecks; Circuit Breaker; Abgleich der tatsächlich laufenden Task-Revision | CloudFormation-Template von AWS validiert; Stack-Erstellung gestartet; laufende Tasks und Redeploy noch offen |
-| EX-04 · Mitarbeiterfotos | Upload/Download; PNG/JPEG/WebP; 5 MiB; Signaturprüfung; UUID; Pfadprüfung; korrekter Content-Type; persistentes Volume; dauerhafter EC2-Pfad | Lokaler Upload/Download und Negativfälle erfolgreich; Foto nach Containerersetzung unverändert; EC2-Redeploy-Test noch offen |
+| EX-01 · EC2 und GitHub Actions | Getrennte Jobs für Test, Build und Deployment; Artefakte; gepinnter SSH-Hostkey; Healthcheck; Backend-Rollback; native MariaDB und systemd | Beide Live-Pipelines grün; Frontend/API auf EC2 mit HTTP 200; Hostkey gegen AWS-Bootausgabe geprüft |
+| EX-02 · Docker Hub | Zwei Multi-Stage-Images; Tags `prod01`, `latest`, Commit-SHA; Veröffentlichung nur auf `main`; Buildx-Cache | Beide Images mit drei Tags veröffentlicht, erneut von Docker Hub gezogen und lokal mit MariaDB gesund gestartet |
+| EX-03 · ECR, ECS, ALB, RDS | Infrastruktur als CloudFormation; private DB; zwei Services mit je zwei Tasks; Healthchecks; Circuit Breaker; Abgleich der tatsächlich laufenden Task-Revision | Stack vollständig erstellt; beide Services mit je zwei gesunden Tasks; vier gesunde ALB-Targets; erfolgreiche automatische Deployments beider Repos |
+| EX-04 · Mitarbeiterfotos | Upload/Download; PNG/JPEG/WebP; 5 MiB; Signaturprüfung; UUID; Pfadprüfung; korrekter Content-Type; persistentes Volume; dauerhafter EC2-Pfad | Upload/Download und Negativfälle erfolgreich; identische Fotos nach lokaler Containerersetzung, Registry-Pull und automatisiertem EC2-Redeploy |
 
-Diese Tabelle trennt vorhandenen Code von einem erfolgreich beobachteten Deployment. Sie wird nach den Live-Prüfungen aktualisiert.
+Die Abnahme basiert auf den unten verlinkten erfolgreichen Workflow-Runs, Browser-Screenshots und den gespeicherten AWS-/HTTP-Abfragen. Der letzte Code-Stand ist separat von der abschliessenden Dokumentation versioniert.
+
+Details: [Technische Entscheidungen](UMSETZUNG.md), [beantwortete Reflexionsfragen](REFLEXION.md) und [Originalauftrag](AUFTRAG.md).
 
 ## Lokale Prüfungen
 
@@ -31,36 +33,71 @@ Diese Tabelle trennt vorhandenen Code von einem erfolgreich beobachteten Deploym
 - Containerersetzung: `docker compose up -d --force-recreate --wait backend`; Bild weiterhin verfügbar, unveränderte Bytes und Datenbankreferenz.
 - SHA256 des Testbilds: `4c5d573cfb85b8ab0a5659062b830a058d1a449e51a6d79c13b483a77ea7ed28`.
 
-## EX-01 · Entscheidungen
+## Live-Abnahme
 
-Die Jar-Datei ist unabhängig von einer bestimmten Datenbank gebaut. Der MariaDB-Zugang wird erst zur Laufzeit eingelesen. Auf EC2 wird ein eigener Datenbankbenutzer für `db_biztrips` verwendet. Ein zufälliges Passwort wird auf der Instanz erzeugt und liegt nur in der geschützten `/etc/biztrips.env`.
+| Ziel | Adresse / Version | Ergebnis |
+|---|---|---|
+| EC2 | <http://13.220.4.150> | Frontend, drei Trips und Fotodownload erfolgreich |
+| ECS/ALB | <http://bbw-m324-Alb-BD6YtmTDd85r-713603972.us-east-1.elb.amazonaws.com> | Frontend und API erfolgreich; Actuator meldet `UP` |
+| Backend | Commit `9771cc5b627bbbd7f98be303e088e4cc8d46f745`, Task-Revision 3 | Alle fünf Jobs erfolgreich |
+| Frontend | Commit `965c5583192eeb3a43d3c38564c5a075fe8fa743`, Task-Revision 3 | Alle fünf Jobs erfolgreich |
 
-Die Pipeline überträgt nur `app.jar.next`, ersetzt die aktuelle Jar und startet systemd neu. Wenn der Healthcheck fehlschlägt, wird die vorherige Jar wieder eingesetzt. Uploads liegen unter `/var/lib/biztrips/uploads` und werden durch den Jar-Transfer nie überschrieben. Das Frontend liegt separat unter `/var/www/biztrips`.
+- [Backend-Run: Test, Build, EC2, Docker Hub, ECS](https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-actions-aws-backend/actions/runs/42182939634)
+- [Frontend-Run: Test, Build, EC2, Docker Hub, ECS](https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-actions-aws-frontend/actions/runs/42182874967)
+- [Backend-Images auf Docker Hub](https://hub.docker.com/r/timh770/bbw-m324-biztrips-refcard03-04-backend/tags)
+- [Frontend-Images auf Docker Hub](https://hub.docker.com/r/timh770/bbw-m324-biztrips-refcard03-04-frontend/tags)
+- [AWS-, Registry- und CI-Abfrage mit Zeitstempel](evidence/live-state.json)
+- [HTTP- und Persistenzabnahme mit SHA256](evidence/http-and-persistence.json)
+- [Tatsächlich registrierte Backend-Task-Definition](../task-definition.json). Die Pipeline rendert neue Definitionen aus den Stack-Ausgaben; diese Datei dokumentiert die abgenommene Revision und enthält nur die Secret-ARN, kein Passwort.
 
-SSH prüft einen vorher hinterlegten Hostkey. Der GitHub-Runner erhält nur für seine aktuelle IPv4-Adresse eine temporäre Port-22-Regel, die beim Verlassen des Deploy-Skripts wieder entfernt wird. Die normale SSH-Regel ist auf die eigene IP beschränkt. MariaDB-Port 3306 und Spring-Port 8080 werden auf EC2 nicht öffentlich geöffnet; nginx stellt die Anwendung auf Port 80 bereit.
+Die Backend-Docker-Hub-Tags `prod01`, `latest` und der volle Commit-SHA zeigen auf den Index-Digest `sha256:7df27e7e1d0f83325c79ebeca485a4ee37599983f6d7e4876b7d5df0b93a50e0`. Beim Frontend ist es `sha256:d2d63210bdabea777dd7e6b56cdfe672bc684a8f3a5c1a0cf25d0f9d734f7a9b`. Beide Veröffentlichungen enthalten amd64- und arm64-Images. Die ECR-Images sind jeweils mit demselben Quellcode-Commit getaggt; ihr Digest kann abweichen, da dort ein separater amd64-Build veröffentlicht wird.
 
-## EX-02 · Entscheidungen
+### Beobachteter Fehler und Korrektur
 
-Im Backend-Image baut ein JDK die Jar, während das Laufzeit-Image nur JRE und Jar enthält und als eigener Benutzer läuft. Das Frontend wird mit Node gebaut und mit nginx ausgeliefert. Build-Caches und Quellcode gelangen nicht ins finale Laufzeit-Image.
+Der erste ECS-Backend-Start scheiterte, weil die aktuelle RDS-MariaDB-Konfiguration unverschlüsselte Verbindungen ablehnt. Die CloudWatch-Meldung lautete `Connections using insecure transport are prohibited`. Im Commit `9771cc5` wurde die JDBC-URL um `sslMode=verify-full` und `serverSslCert=/app/rds-ca-bundle.crt` ergänzt. Das Runtime-Image enthält die öffentliche [AWS-RDS-CA-Sammlung](https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem). Damit werden Zertifikatskette und Hostname geprüft. Die Schutzvorgabe der Datenbank bleibt aktiv.
 
-`latest` und `prod01` sind bewegliche Verweise. Der volle Git-SHA verknüpft ein veröffentlichtes Image mit seinem Quellcode. Die React-App verwendet `/v1` auf demselben Origin. nginx leitet diese Anfragen an das Backend weiter. `BACKEND_ORIGIN` konfiguriert den Proxy beim Containerstart; das ist bewusst unabhängig von Vites Build-Variablen.
+Die erste reine ECS-Stabilitätsabfrage hatte zudem noch keinen erfolgreichen externen HTTP-Aufruf garantiert. Die Pipeline wartet deshalb zusätzlich auf `elbv2 target-in-service` und prüft erst danach HTTP 200. Der anschliessende Run ist vollständig grün, beide Backend-Targets sind gesund und `/v1/trips` liefert exakt die drei Demo-Trips. Die Korrektur und ihre Wirkung sind in Commit, Logs und erfolgreichem Folgerun nachvollziehbar.
 
-## EX-03 · Entscheidungen
+### Browser-Screenshots
 
-RDS ist ausschliesslich für die Task-Security-Group auf Port 3306 erreichbar. Backend-Port 8080 und Frontend-Port 80 akzeptieren eingehend ausschliesslich die ALB-Security-Group. Die Tasks erhalten öffentliche IPs für ausgehende Registry- und Log-Verbindungen, haben jedoch keine öffentliche Eingangsregel. Die DB erhält keine öffentliche IP.
+EC2 mit individuellem Titel und getesteter Wishlist:
 
-ALB leitet `/v1/*` und `/actuator/health` ans Backend, alle übrigen Pfade ans Frontend. Healthchecks prüfen die laufenden Container. Das Backend prüft über Actuator auch seine Datenbank. Beim ersten Service-Start wird zunächst ein Task gesund gestartet, damit die Demo-Daten einmal angelegt werden; danach wird auf zwei Tasks skaliert.
+![EC2-Frontend von Tim Held](evidence/ec2-frontend.png)
 
-ECS ersetzt Tasks bei einem Rolling Deployment. Der Deploy-Code wartet auf Stabilität und vergleicht anschliessend die aktive Task-Definition mit der gerade registrierten Revision. Ein automatischer Rollback kann dadurch nicht als erfolgreicher neuer Release erscheinen.
+ECS über den Application Load Balancer:
 
-Das Learner Lab erlaubt keine eigene IAM-/OIDC-Rolle. Es werden die vorhandenen `LabRole` und `LabInstanceProfile` verwendet. Für GitHub liegt der temporäre Lab-Zugang als verschlüsseltes Secret `AWS_CREDENTIALS` vor. Nach Ablauf oder Neustart einer Lab-Session wird der komplette `[default]`-Block aus AWS Details in beiden Repos erneuert. Die Pipeline schreibt die drei Werte ohne Ausgabe in ihre Laufzeitumgebung. In einem regulären AWS-Account wäre eine auf Repository, Branch und benötigte APIs beschränkte OIDC-Rolle vorzuziehen. Der ECS-Job unterstützt diese Alternative über `AWS_ROLE_ARN`.
+![ECS-Frontend](evidence/ecs-frontend.png)
 
-## EX-04 · Entscheidungen und Grenzen
+Backend-Pipeline mit allen fünf erfolgreichen Jobs:
 
-Die Datenbank speichert nur den generierten Dateinamen. Der Server verwendet weder den eingereichten Dateinamen noch dessen Endung als Speicherpfad. Er prüft MIME-Type und Dateisignatur, begrenzt die Grösse, verhindert Pfade ausserhalb des Storage-Verzeichnisses und lehnt Symlinks ab. Die Signaturprüfung ersetzt keine vollständige Bilddekodierung oder Bildaufbereitung.
+![Backend-Workflow](evidence/backend-workflow.png)
 
-PNG wird als PNG, JPEG als JPEG und WebP als WebP ausgeliefert. Leere oder ungültige Dateien werden abgelehnt. Wenn die Datenbankspeicherung scheitert, wird die gerade neu geschriebene Datei entfernt. Nach erfolgreichem Ersetzen wird das vorherige Foto aufgeräumt.
+Frontend-Pipeline mit allen fünf erfolgreichen Jobs:
 
-Ein benanntes Docker-Volume überlebt das Entfernen eines Containers, bleibt aber an seinen Docker-Host gebunden. Ein Fargate-Task hat ein eigenes flüchtiges Dateisystem. Ein Foto auf Task A ist auf Task B nicht vorhanden und geht bei Task-Ersetzung verloren. Auch ein einzelner Task löst den Verlust beim Redeploy nicht. Eine dauerhafte Lösung für mehrere Tasks benötigt einen gemeinsamen Speicher, beispielsweise S3 in RefCard05. Diese Erweiterung ist hier nicht implementiert.
+![Frontend-Workflow](evidence/frontend-workflow.png)
 
-Die offenen API-Endpunkte und Demo-Konten stammen aus dem Unterrichtsstarter. Die Veröffentlichung dient der Übung; reale personenbezogene Fotos werden dafür nicht verwendet.
+Veröffentlichte Backend-Tags:
+
+![Docker Hub Backend](evidence/backend-dockerhub.png)
+
+Veröffentlichte Frontend-Tags:
+
+![Docker Hub Frontend](evidence/frontend-dockerhub.png)
+
+AWS-Konsole mit zwei aktiven Services und vier laufenden Tasks:
+
+![ECS-Services](evidence/ecs-services.png)
+
+ECR mit dem Commit-Tag der abgenommenen Backend-Version:
+
+![ECR-Backend-Image](evidence/ecr-backend.png)
+
+RDS-MariaDB mit Status `Available`:
+
+![RDS-Datenbank](evidence/rds.png)
+
+## Betrieb nach der Abnahme
+
+Die Lab-Zugangsdaten laufen ab. Für einen späteren Deploy den vollständigen `AWS_CREDENTIALS`-Block in beiden Repos erneuern. Der Docker-Hub-Token wurde mit Read/Write und Ablauf nach 30 Tagen angelegt. Für einen späteren Push nach seinem Ablauf ist ebenfalls eine Erneuerung nötig.
+
+Die AWS-Ressourcen bleiben zur Kontrolle bestehen. Fargate-Tasks, ALB und RDS benötigen Lab-Budget; ein Ende der Lab-Session ist kein vollständiger Abbau dieses Stacks. Die API-Adressen und EC2-SSH-IP können sich nach Stop/Start ändern. Dann zuerst die aktuelle Adresse und den Hostkey prüfen und die Environment-Secrets anpassen.

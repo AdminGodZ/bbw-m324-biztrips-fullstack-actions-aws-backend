@@ -408,11 +408,6 @@
       "Value": {
         "Ref": "Logs"
       }
-    },
-    "Ec2SecurityGroup": {
-      "Value": {
-        "Ref": "Ec2Security"
-      }
     }
   }
 }

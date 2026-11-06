@@ -1,0 +1,73 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "biztrips-backend",
+      "image": "471112806058.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-biztrips-refcard03-04-backend:9771cc5b627bbbd7f98be303e088e4cc8d46f745",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "DB_URL",
+          "value": "jdbc:mariadb://bbw-m324-biztrips-refcard03-04-database-bftrnle7sufj.c3kmi4mq65tu.us-east-1.rds.amazonaws.com:3306/db_biztrips?sslMode=verify-full&serverSslCert=/app/rds-ca-bundle.crt"
+        },
+        {
+          "name": "DB_USER",
+          "value": "biztrips"
+        },
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "mariadb"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:471112806058:secret:DbSecret-wheSAe1gvnFo-ppoezF:password::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/bbw-m324-biztrips-refcard03-04",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1"
+        ],
+        "interval": 15,
+        "timeout": 5,
+        "retries": 5,
+        "startPeriod": 90
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "bbw-m324-biztrips-backend",
+  "taskRoleArn": "arn:aws:iam::471112806058:role/LabRole",
+  "executionRoleArn": "arn:aws:iam::471112806058:role/LabRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024"
+}
