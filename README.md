@@ -1,66 +1,48 @@
-# RefCard 03 – Spring Boot Backend + MariaDB
+# Business Trips · Backend · RefCard03–04
 
-REST-API-Backend für die BusinessTrips-Applikation (Mitarbeitende, Business
-Trips, Flüge, Meetings). Teil der CI/CD-Übungssequenz **RefCard 02–05**
-(siehe [`docs/future/RefCard-03-RefCard-05-own-repos.md`](docs/future/RefCard-03-RefCard-05-own-repos.md))
-— dieses Repository ist **RefCard 03**: Spring Boot Backend mit MariaDB.
-
-## Tech-Stack
-
-- Java 21, Spring Boot 4.1 (Web, Data JPA)
-- MariaDB (lokal via Docker Compose) / H2 (Default, für Tests und schnellen lokalen Start)
-- Maven (Maven Wrapper, kein lokales Maven nötig)
+Tim Held, M324. Java 21, Spring Boot, MariaDB, GitHub Actions, EC2, Docker Hub, ECS/Fargate und lokaler Foto-Storage.
 
 ## Schnellstart
 
-### Ohne Datenbank-Setup (H2, Default)
+Frontend als Nachbarordner `../frontend` auschecken, dann:
 
 ```bash
-./mvnw spring-boot:run
+docker compose up -d --build --wait
 ```
 
-Startet auf Port 8080 mit einer flüchtigen In-Memory-H2-Datenbank (Daten sind nach jedem Neustart weg, werden aber automatisch neu geseedet).
+Frontend: http://localhost:3000 · API: http://localhost:8080/v1/trips · Health: http://localhost:8080/actuator/health.
 
-### Mit MariaDB (persistent, wie in Produktion)
+Ohne Docker: `./mvnw test` und `./mvnw spring-boot:run` verwenden die eingebettete H2-Datenbank. Für MariaDB `SPRING_PROFILES_ACTIVE=mariadb`, `DB_URL`, `DB_USER` und `DB_PASSWORD` setzen. Lokale Compose-Passwörter sind ausschliesslich Entwicklungswerte und lassen sich über `.env` überschreiben.
+
+## Fotos
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
-./mvnw spring-boot:run -Dspring-boot.run.profiles=mariadb
+curl -f http://localhost:8080/v1/employees
+curl -f -X POST http://localhost:8080/v1/employees/1/photo -F 'file=@test.png'
+curl -f http://localhost:8080/v1/employees/1/photo -o downloaded.png
 ```
 
-- MariaDB läuft dann auf `localhost:3306` (Datenbank `db_biztrips`, User `root`, Passwort `bbw123`)
-- phpMyAdmin ist unter [http://localhost:8082](http://localhost:8082) erreichbar (gleiche Zugangsdaten)
-- Die Demo-Daten werden nur beim allerersten Start eingefügt — ein Neustart der Applikation dupliziert sie nicht
+PNG, JPEG und WebP bis 5 MiB. `APP_STORAGE_LOCATION` bestimmt den Pfad. Compose mountet `uploads:/app/uploads`; EC2 verwendet `/var/lib/biztrips/uploads`. Der Container läuft ohne root. Datenbank und Uploads bleiben bei normalem `docker compose down` erhalten.
 
-### Tests ausführen
+## GitHub Actions und AWS
 
-```bash
-./mvnw test
-```
+Die Pipeline testet und baut jeden Pull Request und jeden Push auf `main`. Veröffentlichungen und Deployments laufen ausschliesslich auf `main`. Die drei Variablen `ENABLE_EC2`, `ENABLE_DOCKERHUB` und `ENABLE_ECS` werden erst nach der jeweiligen Einrichtung auf `true` gesetzt. Ein übersprungener Job ist kein erfolgreicher Deploy.
 
-## API
+| Secret/Variable | Ort und Bedeutung |
+|---|---|
+| `AWS_CREDENTIALS` | Repository-Secret, vollständiger temporärer `[default]`-Block aus Learner Lab AWS Details |
+| `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` | Repository-Secrets, Benutzer und Read/Write-Token für die Images |
+| `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_KNOWN_HOSTS` | Secrets im Environment `production`; Host, Benutzer, PEM und gepinnter SSH-Hostkey |
+| `EC2_SECURITY_GROUP` | Repository-Variable, Security Group für die kurzzeitige Runner-IP-Regel |
+| `ENABLE_EC2`, `ENABLE_DOCKERHUB`, `ENABLE_ECS` | Repository-Variablen für die fertig eingerichteten Ziele |
+| `AWS_ROLE_ARN` | Optionale Repository-Variable für OIDC im ECS-Job ausserhalb des Learner Labs |
 
-Basis-Pfad: `/v1`
+Das eigene Infrastruktur-Template liegt in `deploy/infrastructure.json`. Es verwendet die vorhandenen Lab-Rollen und zwei Subnetze derselben VPC in unterschiedlichen Availability Zones. EC2 ist für EX-01/04 zuständig; ALB, ECR, RDS und ECS gehören zu EX-03. Das Template legt keine eigenen IAM-Rollen an. SSH-CIDR beim Erstellen auf die eigene IPv4-Adresse mit `/32` begrenzen. Die Actions öffnen und schliessen zusätzlich nur die jeweilige Runner-IP.
 
-| Endpoint | Beschreibung |
-| --- | --- |
-| `GET /v1/trips`, `POST /v1/trips`, `GET /v1/trips/{id}`, `DELETE /v1/trips/{id}` | Business Trips |
-| `GET /v1/employees`, `POST /v1/employees`, `GET /v1/employees/{id}`, `PUT /v1/employees/{id}`, `DELETE /v1/employees/{id}`, `DELETE /v1/employees` | Mitarbeitende |
-| `GET /v1/flights`, `POST /v1/flights`, `GET /v1/flights/{id}`, `PUT /v1/flights/{id}`, `DELETE /v1/flights/{id}`, `DELETE /v1/flights` | Flüge |
-| `GET /v1/meetings`, `POST /v1/meetings`, `GET /v1/meetings/{id}`, `PUT /v1/meetings/{id}`, `DELETE /v1/meetings/{id}`, `DELETE /v1/meetings` | Meetings |
-| `POST /v1/signIn` | Login (Demo-User: `joe` / `1234`) |
-| `GET /actuator/health` | Health-Check (Spring Boot Actuator) — prüft u. a. die Datenbankverbindung |
+Credentials laufen mit der Lab-Session ab. Vor einem neuen Pipeline-Lauf den ganzen `AWS_CREDENTIALS`-Block in beiden Repositories erneuern. Keine Credentials in Dateien committen oder in Logs ausgeben.
 
-## Projektstruktur
+## Nachweise
 
-```
-src/main/java/ch/bbw/trips/   Applikationscode (Controller, Entities, Repositories, DTOs)
-docker/docker-compose.yml     MariaDB + phpMyAdmin für die lokale Entwicklung
-docs/exercises/               CI/CD-Übungen (EX-01 EC2, EX-02 Docker Hub, EX-03 ECS/RDS)
-docs/reviews/                 Code-Reviews
-docs/future/                  Planungsentscheidungen für RefCard 03–05
-```
+[Umsetzung, Prüfstand und Reflexion](docs/NACHWEIS.md). Die originalen Aufgaben bleiben unter `docs/exercises`; die ursprüngliche README liegt unter `docs/UPSTREAM-README.md`.
 
-## Für Studierende
-
-Der Tag [`v1-start`](../../releases/tag/v1-start) markiert den Ausgangspunkt für die Übungen in `docs/exercises/` — bewusst **ohne** `Dockerfile`, `.dockerignore`, `.github/workflows/deploy.yml` und `task-definition.json`, da ihr genau diese Dateien in EX-01/EX-02/EX-03 selbst erstellt.
+Fotos in ECS sind in RefCard04 bewusst flüchtig. Dauerhafter gemeinsamer Foto-Storage für mehrere Fargate-Tasks ist Gegenstand von RefCard05. Der Nachweis erklärt die Grenze.

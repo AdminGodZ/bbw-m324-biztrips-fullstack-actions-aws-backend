@@ -1,0 +1,37 @@
+name: biztrips-refcard03-04
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: db_biztrips
+      MARIADB_USER: biztrips
+      MARIADB_PASSWORD: ${DB_PASSWORD:-local-biztrips-only}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-local-root-only}
+    volumes: [database:/var/lib/mysql]
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  backend:
+    build: .
+    image: biztrips-refcard03-04-backend:local
+    environment:
+      SPRING_PROFILES_ACTIVE: mariadb
+      DB_URL: jdbc:mariadb://db:3306/db_biztrips
+      DB_USER: biztrips
+      DB_PASSWORD: ${DB_PASSWORD:-local-biztrips-only}
+      APP_STORAGE_LOCATION: /app/uploads
+    ports: ['127.0.0.1:8080:8080']
+    volumes: [uploads:/app/uploads]
+    depends_on:
+      db: {condition: service_healthy}
+  frontend:
+    build: ../frontend
+    image: biztrips-refcard03-04-frontend:local
+    ports: ['127.0.0.1:3000:80']
+    depends_on:
+      backend: {condition: service_healthy}
+volumes:
+  database:
+  uploads:
