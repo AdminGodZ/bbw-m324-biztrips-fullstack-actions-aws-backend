@@ -1,0 +1,75 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "DenyInsecureTransport",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733",
+                "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733/*"
+            ],
+            "Condition": {
+                "Bool": {
+                    "aws:SecureTransport": "false"
+                }
+            }
+        },
+        {
+            "Sid": "BackendRoleOnlyPhotoObjectOperations",
+            "Effect": "Deny",
+            "Principal": "*",
+            "NotAction": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733",
+                "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733/*"
+            ],
+            "Condition": {
+                "ArnLike": {
+                    "aws:PrincipalArn": "arn:aws:iam::191612072733:role/LabRole"
+                }
+            }
+        },
+        {
+            "Sid": "BackendRoleOnlyPhotoPrefix",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "NotResource": "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733/employee-photos/*",
+            "Condition": {
+                "ArnLike": {
+                    "aws:PrincipalArn": "arn:aws:iam::191612072733:role/LabRole"
+                }
+            }
+        },
+        {
+            "Sid": "NoObjectAccessForOtherPrincipals",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::bbw-m324-refcard05-photos-191612072733/*",
+            "Condition": {
+                "ArnNotLike": {
+                    "aws:PrincipalArn": [
+                        "arn:aws:iam::191612072733:role/LabRole",
+                        "arn:aws:iam::191612072733:role/voclabs"
+                    ]
+                }
+            }
+        }
+    ]
+}

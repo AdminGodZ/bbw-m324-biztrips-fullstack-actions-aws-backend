@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PhotoObjectsOnlyBelowPrefix",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::bbw-m324-refcard05-photos-<ACCOUNT_ID>/employee-photos/*"
+    },
+    {
+      "Sid": "ListOnlyPhotoPrefixForHealthCheck",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::bbw-m324-refcard05-photos-<ACCOUNT_ID>",
+      "Condition": {"StringLike": {"s3:prefix": ["employee-photos/*"]}}
+    }
+  ]
+}

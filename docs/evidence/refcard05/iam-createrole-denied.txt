@@ -1,0 +1,2 @@
+
+aws: [ERROR]: An error occurred (AccessDenied) when calling the CreateRole operation: User: arn:aws:sts::191612072733:assumed-role/voclabs/<lab-user> is not authorized to perform: iam:CreateRole on resource: arn:aws:iam::191612072733:role/bbw-m324-refcard05-backend-task because no identity-based policy allows the iam:CreateRole action. Go to <console-link> for complete details, or call the GetRequestAuthorizationDetails API with the following authorization id: <redacted>
