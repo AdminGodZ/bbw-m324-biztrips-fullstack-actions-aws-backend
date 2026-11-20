@@ -1,0 +1,9 @@
+=== Least-privilege check as arn:aws:sts::191612072733:assumed-role/LabRole
+ALLOWED | PutObject    employee-photos/iam-check.txt
+ALLOWED | GetObject    employee-photos/iam-check.txt
+ALLOWED | ListBucket   prefix employee-photos/
+DENIED  | PutObject    other-prefix/iam-check.txt (outside prefix) | An error occurred (AccessDenied)
+DENIED  | GetBucketPolicy | An error occurred (AccessDenied)
+DENIED  | DeleteBucketPolicy | An error occurred (AccessDenied)
+ALLOWED | DeleteObject employee-photos/iam-check.txt
+=== done
