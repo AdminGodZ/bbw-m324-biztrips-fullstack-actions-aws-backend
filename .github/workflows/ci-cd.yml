@@ -1,0 +1,182 @@
+# M324 RefCard05 (Tim Held) - Backend pipeline: build -> test -> image -> Amazon ECR -> Amazon ECS
+#
+#   pull_request        build + test + Docker build (no push, no AWS credentials needed)
+#   push to main        ... + push image <describe-version> to ECR + rolling deploy on ECS + verification
+#   push tag vX.Y.Z     ... + push image X.Y.Z (and X.Y) to ECR + rolling deploy on ECS + verification
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    paths-ignore: ['docs/**', '**.md']
+  pull_request:
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One deployment at a time per ref; PR runs are superseded by newer commits.
+  group: backend-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: bbw-m324-refcard05-backend
+  M324_STACK: bbw-m324-refcard05
+
+jobs:
+  build-test:
+    name: Build & test (Maven)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compile, unit tests, package
+        run: ./mvnw -B -ntp verify
+      - name: Test summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          rows, total = [], {'tests': 0, 'failures': 0, 'errors': 0, 'skipped': 0}
+          for f in sorted(glob.glob('target/surefire-reports/TEST-*.xml')):
+              s = ET.parse(f).getroot()
+              counts = {k: int(s.get(k, 0)) for k in total}
+              for k in total: total[k] += counts[k]
+              ok = counts['failures'] + counts['errors'] == 0
+              rows.append(f"| {'✅' if ok else '❌'} | `{s.get('name').split('.')[-1]}` | {counts['tests']} |")
+          print('### Backend tests\n\n| | Test class | Tests |\n|---|---|---|')
+          print('\n'.join(rows))
+          print(f"\n**{total['tests']} tests, {total['failures']} failures, {total['errors']} errors, {total['skipped']} skipped**")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: backend-test-reports
+          path: target/surefire-reports
+          retention-days: 14
+
+  version:
+    name: Determine version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tags: ${{ steps.v.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # all tags for git describe
+      - id: v
+        name: Version from Git tag (SemVer)
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag $GITHUB_REF_NAME is not SemVer vMAJOR.MINOR.PATCH"; exit 1; }
+            minor="${version%.*}"
+            tags="$version $minor"
+          else
+            # Untagged commit: last release + distance + commit, e.g. 5.0.0-3-gabc1234
+            described=$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || echo "v0.0.0-0-g$(git rev-parse --short HEAD)")
+            version="${described#v}"
+            tags="$version"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "### Version \`$version\` (ECR tags: \`$tags\`)" >> "$GITHUB_STEP_SUMMARY"
+
+  image:
+    name: Docker image -> Amazon ECR
+    needs: [build-test, version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    env:
+      PUSH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/aws-learner-lab
+        if: env.PUSH == 'true'
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        if: env.PUSH == 'true'
+        id: ecr
+      - id: meta
+        name: Image name and tags
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry || 'local' }}
+          TAGS: ${{ needs.version.outputs.tags }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          repo="$REGISTRY/$ECR_REPOSITORY"
+          {
+            echo "image=$repo:$VERSION"
+            echo "tags<<EOF"
+            for t in $TAGS; do echo "$repo:$t"; done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - name: Build (multi-stage Maven -> JRE) and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: ${{ env.PUSH == 'true' }}
+          platforms: linux/amd64
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            APP_VERSION=${{ needs.version.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+      - name: Verify image in ECR
+        if: env.PUSH == 'true'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$VERSION" \
+            --query 'imageDetails[0].{tags:imageTags,digest:imageDigest,pushed:imagePushedAt,sizeMB:imageSizeInBytes}' --output table
+          {
+            echo "### Image pushed to Amazon ECR"
+            echo "\`${{ steps.meta.outputs.image }}\`  "
+            echo "digest \`${{ steps.build.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to ECS Fargate + verify
+    needs: [version, image]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      # Never two rollouts of the same ECS service at once (e.g. main push + release tag): queue them.
+      group: ecs-backend
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/aws-learner-lab
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Register task definition, roll out service, verify version
+        id: deploy
+        run: python3 deploy/ecs-deploy.py backend "${{ needs.image.outputs.image }}" "${{ needs.version.outputs.version }}"
