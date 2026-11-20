@@ -1,0 +1,45 @@
+AWS session OK: arn:aws:sts::191612072733:assumed-role/voclabs/***
+      "image": "191612072733.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-refcard05-backend:5.0.2",
+Updating service biztrips-backend -> arn:aws:ecs:us-east-1:191612072733:task-definition/bbw-m324-refcard05-backend:3
+  [ecs] 2026-11-20T07:37:38.511000+00:00 (service biztrips-backend) registered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-1:191612072733:targetgroup/refcard05-backend/99e2324a545f8e6a)
+  [ecs] 2026-11-20T07:38:49.452000+00:00 (service biztrips-backend) (deployment ecs-svc/0053677187293305884) deployment completed.
+  [ecs] 2026-11-20T07:38:49.453000+00:00 (service biztrips-backend) has reached a steady state.
+  [ecs] 2026-11-20T07:47:58.756000+00:00 (service biztrips-backend) has started 1 tasks: (task fbabbf9e49154ee0aca6aeda62b91108).
+  [ecs] 2026-11-20T07:48:28.583000+00:00 (service biztrips-backend) registered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-1:191612072733:targetgroup/refcard05-backend/99e2324a545f8e6a)
+  [ecs] 2026-11-20T07:49:39.719000+00:00 (service biztrips-backend) has stopped 1 running tasks: (task 6c09f12ec64443efa67178e15339766a).
+  [ecs] 2026-11-20T07:49:49.077000+00:00 (service biztrips-backend) deregistered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-1:191612072733:targetgroup/refcard05-backend/99e2324a545f8e6a)
+  [ecs] 2026-11-20T07:49:49.082000+00:00 (service biztrips-backend, taskSet ecs-svc/0053677187293305884) has begun draining connections on 1 tasks.
+  [ecs] 2026-11-20T07:50:51.053000+00:00 (service biztrips-backend) (deployment ecs-svc/4366389277148058702) deployment completed.
+  [ecs] 2026-11-20T07:50:51.054000+00:00 (service biztrips-backend) has reached a steady state.
+  rollout IN_PROGRESS: running 0/0, failed tasks 0
+  [ecs] 2026-11-20T08:00:41.434000+00:00 (service biztrips-backend) has started 1 tasks: (task fa5074c7262141088693afe3e8d35bf1).
+  rollout IN_PROGRESS: running 0/1, failed tasks 0
+  rollout IN_PROGRESS: running 0/1, failed tasks 0
+  [ecs] 2026-11-20T08:01:11.355000+00:00 (service biztrips-backend) registered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-1:191612072733:targetgroup/refcard05-backend/99e2324a545f8e6a)
+  rollout IN_PROGRESS: running 0/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  [ecs] 2026-11-20T08:02:13.168000+00:00 (service biztrips-backend) has stopped 1 running tasks: (task fbabbf9e49154ee0aca6aeda62b91108).
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  [ecs] 2026-11-20T08:02:22.907000+00:00 (service biztrips-backend) deregistered 1 targets in (target-group arn:aws:elasticloadbalancing:us-east-1:191612072733:targetgroup/refcard05-backend/99e2324a545f8e6a)
+  [ecs] 2026-11-20T08:02:22.912000+00:00 (service biztrips-backend, taskSet ecs-svc/4366389277148058702) has begun draining connections on 1 tasks.
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  rollout IN_PROGRESS: running 1/1, failed tasks 0
+  [ecs] 2026-11-20T08:03:24.230000+00:00 (service biztrips-backend) (deployment ecs-svc/8504352001816571929) deployment completed.
+  [ecs] 2026-11-20T08:03:24.231000+00:00 (service biztrips-backend) has reached a steady state.
+  rollout COMPLETED: running 1/1, failed tasks 0
+  verify OK (1/5): http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/info -> {"app":{"name":"biztrips-backend","version":"5.0.2","commit":"d0150b8261325b2ec5d25c5cef82ecb68cadb925","refcard":"RefCard05"},"storage":{"type":"s3"}} | http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/health/readiness -> {"components":{"db":{"status":"UP"},"readinessState":{"status":"UP"},"s3":{"status":"UP"}},"status":"UP"}
+  verify OK (2/5): http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/info -> {"app":{"name":"biztrips-backend","version":"5.0.2","commit":"d0150b8261325b2ec5d25c5cef82ecb68cadb925","refcard":"RefCard05"},"storage":{"type":"s3"}} | http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/health/readiness -> {"components":{"db":{"status":"UP"},"readinessState":{"status":"UP"},"s3":{"status":"UP"}},"status":"UP"}
+  verify OK (3/5): http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/info -> {"app":{"name":"biztrips-backend","version":"5.0.2","commit":"d0150b8261325b2ec5d25c5cef82ecb68cadb925","refcard":"RefCard05"},"storage":{"type":"s3"}} | http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/health/readiness -> {"components":{"db":{"status":"UP"},"readinessState":{"status":"UP"},"s3":{"status":"UP"}},"status":"UP"}
+  verify OK (4/5): http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/info -> {"app":{"name":"biztrips-backend","version":"5.0.2","commit":"d0150b8261325b2ec5d25c5cef82ecb68cadb925","refcard":"RefCard05"},"storage":{"type":"s3"}} | http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/health/readiness -> {"components":{"db":{"status":"UP"},"readinessState":{"status":"UP"},"s3":{"status":"UP"}},"status":"UP"}
+  verify OK (5/5): http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/info -> {"app":{"name":"biztrips-backend","version":"5.0.2","commit":"d0150b8261325b2ec5d25c5cef82ecb68cadb925","refcard":"RefCard05"},"storage":{"type":"s3"}} | http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com/actuator/health/readiness -> {"components":{"db":{"status":"UP"},"readinessState":{"status":"UP"},"s3":{"status":"UP"}},"status":"UP"}
+  "service": "biztrips-backend",
+  "cluster": "bbw-m324-refcard05",
+  "image": "191612072733.dkr.ecr.us-east-1.amazonaws.com/bbw-m324-refcard05-backend:5.0.2",
+  "version": "5.0.2",
+  "taskDefinition": "bbw-m324-refcard05-backend:3",
+  "runningCount": 1,
+  "url": "http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com",

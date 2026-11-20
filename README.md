@@ -1,55 +1,38 @@
-# Business Trips · Backend · RefCard03–04
+# Business Trips · Backend · RefCard05 (Full Stack auf AWS)
 
-Tim Held, M324. Java 21, Spring Boot, MariaDB, GitHub Actions, EC2, Docker Hub, ECS/Fargate und lokaler Foto-Storage.
+Tim Held, M324. Spring Boot 4 (Java 21) · Amazon RDS MariaDB · Amazon S3 · ECR · ECS Fargate · GitHub Actions.
+
+**→ Dokumentation RefCard05: [docs/REFCARD05.md](docs/REFCARD05.md)** (Architektur, Pipeline, Versionierung, RDS, S3/IAM Least Privilege, ECS, Secrets/OIDC, Nachweise)
+
+| | |
+|---|---|
+| Frontend-Repo | <https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-actions-aws-frontend> |
+| Lokale Entwicklung (Compose) | <https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-compose> |
+| Pipeline | [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml): build → test → Image → ECR → ECS + Verifikation |
+| Infrastruktur | [`deploy/infrastructure.yaml`](deploy/infrastructure.yaml) (CloudFormation-Stack `bbw-m324-refcard05`) |
+| Releases | Git-Tags `vX.Y.Z` → ECR-Image `X.Y.Z` |
 
 ## Schnellstart
 
-Frontend als Nachbarordner `../frontend` auschecken, dann:
-
 ```bash
-docker compose up -d --build --wait
+./mvnw test              # 17 Tests, ohne Datenbank oder AWS (H2 + gemockter S3-Client)
+./mvnw spring-boot:run   # H2, Fotos in ./uploads → http://localhost:8080/v1/trips
 ```
 
-Frontend: http://localhost:3000 · API: http://localhost:8080/v1/trips · Health: http://localhost:8080/actuator/health.
+Das ganze System (Frontend, Backend, MariaDB, S3-Mock) läuft lokal über das [Compose-Repo](https://github.com/AdminGodZ/bbw-m324-biztrips-fullstack-compose).
 
-Ohne Docker: `./mvnw test` und `./mvnw spring-boot:run` verwenden die eingebettete H2-Datenbank. Für MariaDB `SPRING_PROFILES_ACTIVE=mariadb`, `DB_URL`, `DB_USER` und `DB_PASSWORD` setzen. Lokale Compose-Passwörter sind ausschliesslich Entwicklungswerte und lassen sich über `.env` überschreiben.
+## Konfiguration (nur Umgebungsvariablen, keine Zugangsdaten im Code)
 
-## Fotos
+| Profil | Datenbank | Fotos | Variablen |
+|---|---|---|---|
+| *(keins)* | H2 | lokal (`APP_STORAGE_LOCATION`) | – |
+| `mariadb` | MariaDB | `APP_STORAGE_TYPE=local\|s3` | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` |
+| `aws` | RDS (TLS verify-full) | S3 | zusätzlich `APP_STORAGE_S3_BUCKET`, `AWS_REGION`. `DB_USER`/`DB_PASSWORD` aus Secrets Manager |
 
-```bash
-curl -f http://localhost:8080/v1/employees
-curl -f -X POST http://localhost:8080/v1/employees/1/photo -F 'file=@test.png'
-curl -f http://localhost:8080/v1/employees/1/photo -o downloaded.png
-```
+## API
 
-PNG, JPEG und WebP bis 5 MiB. `APP_STORAGE_LOCATION` bestimmt den Pfad. Compose mountet `uploads:/app/uploads`; EC2 verwendet `/var/lib/biztrips/uploads`. Der Container läuft ohne root. Datenbank und Uploads bleiben bei normalem `docker compose down` erhalten.
+`GET /v1/trips`, `GET /v1/employees`, `POST|GET /v1/employees/{id}/photo` (PNG/JPEG/WebP ≤ 5 MiB) · `GET /actuator/health[/readiness]` · `GET /actuator/info` (Version)
 
-## GitHub Actions und AWS
+## Ältere Stände
 
-Die Pipeline testet und baut jeden Pull Request und jeden Push auf `main`. Veröffentlichungen und Deployments laufen ausschliesslich auf `main`. Die drei Variablen `ENABLE_EC2`, `ENABLE_DOCKERHUB` und `ENABLE_ECS` werden erst nach der jeweiligen Einrichtung auf `true` gesetzt. Ein übersprungener Job ist kein erfolgreicher Deploy.
-
-| Secret/Variable | Ort und Bedeutung |
-|---|---|
-| `AWS_CREDENTIALS` | Repository-Secret, vollständiger temporärer `[default]`-Block aus Learner Lab AWS Details |
-| `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` | Repository-Secrets, Benutzer und Read/Write-Token für die Images |
-| `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_KNOWN_HOSTS` | Secrets im Environment `production`; Host, Benutzer, PEM und gepinnter SSH-Hostkey |
-| `EC2_SECURITY_GROUP` | Repository-Variable, Security Group für die kurzzeitige Runner-IP-Regel |
-| `ENABLE_EC2`, `ENABLE_DOCKERHUB`, `ENABLE_ECS` | Repository-Variablen für die fertig eingerichteten Ziele |
-| `AWS_ROLE_ARN` | Optionale Repository-Variable für OIDC im ECS-Job ausserhalb des Learner Labs |
-
-Das eigene Infrastruktur-Template liegt in `deploy/infrastructure.json`. Es verwendet die vorhandenen Lab-Rollen und zwei Subnetze derselben VPC in unterschiedlichen Availability Zones. EC2 ist für EX-01/04 zuständig; ALB, ECR, RDS und ECS gehören zu EX-03. Das Template legt keine eigenen IAM-Rollen an. SSH-CIDR beim Erstellen auf die eigene IPv4-Adresse mit `/32` begrenzen. Die Actions öffnen und schliessen zusätzlich nur die jeweilige Runner-IP.
-
-Credentials laufen mit der Lab-Session ab. Vor einem neuen Pipeline-Lauf den ganzen `AWS_CREDENTIALS`-Block in beiden Repositories erneuern. Keine Credentials in Dateien committen oder in Logs ausgeben.
-
-## Abgenommene Anwendung
-
-- EC2: http://13.220.4.150
-- ECS: http://bbw-m324-Alb-BD6YtmTDd85r-713603972.us-east-1.elb.amazonaws.com
-- Beide Pipelines sind vollständig grün. ECS betreibt je zwei gesunde Backend- und Frontend-Tasks.
-- `task-definition.json` dokumentiert die tatsächlich registrierte Revision; `deploy/ecs-deploy.py` rendert die nächsten Revisionen aus der Infrastruktur.
-
-## Nachweise
-
-[Umsetzung, Prüfstand und Reflexion](docs/NACHWEIS.md). Die originalen Aufgaben bleiben unter `docs/exercises`; die ursprüngliche README liegt unter `docs/UPSTREAM-README.md`.
-
-Fotos in ECS sind in RefCard04 bewusst flüchtig. Dauerhafter gemeinsamer Foto-Storage für mehrere Fargate-Tasks ist Gegenstand von RefCard05. Der Nachweis erklärt die Grenze.
+RefCard03/04 (EC2, Docker Hub, ECS mit lokalem Foto-Storage): [docs/NACHWEIS.md](docs/NACHWEIS.md), Aufträge unter `docs/exercises`, ursprüngliche README unter [docs/UPSTREAM-README.md](docs/UPSTREAM-README.md).
