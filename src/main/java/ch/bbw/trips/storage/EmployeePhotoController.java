@@ -16,9 +16,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class EmployeePhotoController {
     private static final Logger log = LoggerFactory.getLogger(EmployeePhotoController.class);
     private final EmployeeRepository employees;
-    private final FileStorageService storage;
+    private final PhotoStorage storage;
 
-    public EmployeePhotoController(EmployeeRepository employees, FileStorageService storage) {
+    public EmployeePhotoController(EmployeeRepository employees, PhotoStorage storage) {
         this.employees = employees;
         this.storage = storage;
     }
@@ -40,7 +40,7 @@ public class EmployeePhotoController {
             throw ex;
         }
         try { storage.delete(old); }
-        catch (IOException ex) { log.warn("Previous photo cleanup failed for employee {}", id); }
+        catch (IOException | RuntimeException ex) { log.warn("Previous photo cleanup failed for employee {}", id); }
         return ResponseEntity.ok().build();
     }
 
