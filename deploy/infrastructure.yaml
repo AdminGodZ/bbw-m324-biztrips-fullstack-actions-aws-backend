@@ -1,0 +1,338 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  M324 RefCard05 (Tim Held) - Business Trips full stack on AWS:
+  ECR (2 repos), ECS Fargate cluster, ALB, RDS MariaDB, S3 photo bucket.
+  ECS services/task definitions are created and updated by the GitHub Actions
+  pipelines of the frontend and backend repositories (deploy/ecs-deploy.py).
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two subnets in different AZs (public, for Fargate tasks with public IP)
+  CreateTaskRole:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: >-
+      'true' in a normal AWS account: creates a dedicated least-privilege task role.
+      'false' in the AWS Academy Learner Lab (iam:CreateRole is denied): the pre-provisioned
+      LabRole is used and the bucket policy enforces least privilege on the resource side.
+  PhotoPrefix:
+    Type: String
+    Default: employee-photos/
+    AllowedPattern: '^[a-z0-9-]+/$'
+
+Conditions:
+  CreateRole: !Equals [!Ref CreateTaskRole, 'true']
+
+Resources:
+  # ---------- Network security ----------
+  AlbSecurity:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RefCard05 public HTTP load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+      Tags: [{Key: Name, Value: bbw-m324-refcard05-alb}]
+
+  TaskSecurity:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RefCard05 ECS tasks, reachable only from the ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, SourceSecurityGroupId: !Ref AlbSecurity}
+        - {IpProtocol: tcp, FromPort: 8080, ToPort: 8080, SourceSecurityGroupId: !Ref AlbSecurity}
+      Tags: [{Key: Name, Value: bbw-m324-refcard05-tasks}]
+
+  DbSecurity:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RefCard05 MariaDB, reachable only from ECS tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 3306, ToPort: 3306, SourceSecurityGroupId: !Ref TaskSecurity}
+      Tags: [{Key: Name, Value: bbw-m324-refcard05-db}]
+
+  # ---------- RDS MariaDB ----------
+  DbSubnets:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: RefCard05 RDS subnets
+      SubnetIds: !Ref Subnets
+
+  DbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: bbw-m324-refcard05/rds-biztrips
+      Description: RefCard05 RDS MariaDB credentials (username + generated password)
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"biztrips"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: bbw-m324-refcard05-mariadb
+      DBInstanceClass: db.t3.micro
+      Engine: mariadb
+      EngineVersion: '11.8'
+      AutoMinorVersionUpgrade: true
+      AllocatedStorage: '20'
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: db_biztrips
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbSecret}:SecretString:password}}'
+      DBSubnetGroupName: !Ref DbSubnets
+      VPCSecurityGroups: [!Ref DbSecurity]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 1
+      MultiAZ: false
+      Tags: [{Key: Project, Value: M324-RefCard05}]
+
+  # ---------- S3 photo storage ----------
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub 'bbw-m324-refcard05-photos-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-replaced-photos
+            Status: Enabled
+            NoncurrentVersionExpiration: {NoncurrentDays: 30}
+      Tags: [{Key: Project, Value: M324-RefCard05}]
+
+  # Resource-side least privilege. In the Learner Lab the backend task must run as LabRole,
+  # whose identity policy we cannot change. The bucket policy therefore limits what LabRole
+  # may do on THIS bucket to exactly the operations the backend needs, under one prefix.
+  PhotoBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PhotoBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt PhotoBucket.Arn, !Sub '${PhotoBucket.Arn}/*']
+            Condition: {Bool: {'aws:SecureTransport': 'false'}}
+          - Sid: BackendRoleOnlyPhotoObjectOperations
+            Effect: Deny
+            Principal: '*'
+            NotAction: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket']
+            Resource: [!GetAtt PhotoBucket.Arn, !Sub '${PhotoBucket.Arn}/*']
+            Condition:
+              ArnLike:
+                'aws:PrincipalArn': !If
+                  - CreateRole
+                  - !GetAtt BackendTaskRole.Arn
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+          - Sid: BackendRoleOnlyPhotoPrefix
+            Effect: Deny
+            Principal: '*'
+            Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject']
+            NotResource: !Sub '${PhotoBucket.Arn}/${PhotoPrefix}*'
+            Condition:
+              ArnLike:
+                'aws:PrincipalArn': !If
+                  - CreateRole
+                  - !GetAtt BackendTaskRole.Arn
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+          - Sid: NoObjectAccessForOtherPrincipals
+            Effect: Deny
+            Principal: '*'
+            Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject']
+            Resource: !Sub '${PhotoBucket.Arn}/*'
+            Condition:
+              ArnNotLike:
+                'aws:PrincipalArn':
+                  - !If
+                    - CreateRole
+                    - !GetAtt BackendTaskRole.Arn
+                    - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/voclabs'
+
+  # Production variant (normal AWS account): dedicated task role, identity-side least privilege.
+  BackendTaskRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRole
+    Properties:
+      RoleName: bbw-m324-refcard05-backend-task
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              ArnLike: {'aws:SourceArn': !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:*'}
+              StringEquals: {'aws:SourceAccount': !Ref 'AWS::AccountId'}
+      Policies:
+        - PolicyName: photo-bucket-least-privilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PhotoObjects
+                Effect: Allow
+                Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject']
+                Resource: !Sub '${PhotoBucket.Arn}/${PhotoPrefix}*'
+              - Sid: ListOnlyPhotoPrefix
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt PhotoBucket.Arn
+                Condition: {StringLike: {'s3:prefix': [!Sub '${PhotoPrefix}*']}}
+
+  # ---------- Container registry ----------
+  BackendEcr:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: bbw-m324-refcard05-backend
+      ImageScanningConfiguration: {ScanOnPush: true}
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[
+            {"rulePriority":1,"description":"remove untagged layers after 3 days",
+             "selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":3},
+             "action":{"type":"expire"}},
+            {"rulePriority":2,"description":"keep the newest 30 images",
+             "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},
+             "action":{"type":"expire"}}]}
+
+  FrontendEcr:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: bbw-m324-refcard05-frontend
+      ImageScanningConfiguration: {ScanOnPush: true}
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[
+            {"rulePriority":1,"description":"remove untagged layers after 3 days",
+             "selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":3},
+             "action":{"type":"expire"}},
+            {"rulePriority":2,"description":"keep the newest 30 images",
+             "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},
+             "action":{"type":"expire"}}]}
+
+  # ---------- ECS + ALB ----------
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: bbw-m324-refcard05
+      ClusterSettings: [{Name: containerInsights, Value: disabled}]
+
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/bbw-m324-refcard05
+      RetentionInDays: 7
+
+  Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: bbw-m324-refcard05
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref Subnets
+      SecurityGroups: [!Ref AlbSecurity]
+
+  BackendTarget:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: refcard05-backend
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 8080
+      HealthCheckPath: /actuator/health/readiness
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: {HttpCode: '200'}
+      TargetGroupAttributes:
+        - {Key: deregistration_delay.timeout_seconds, Value: '30'}
+
+  FrontendTarget:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: refcard05-frontend
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 80
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 15
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: {HttpCode: '200'}
+      TargetGroupAttributes:
+        - {Key: deregistration_delay.timeout_seconds, Value: '15'}
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref Alb
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: [{Type: forward, TargetGroupArn: !Ref FrontendTarget}]
+
+  ApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref Listener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values: ['/v1/*', '/actuator/*']
+      Actions: [{Type: forward, TargetGroupArn: !Ref BackendTarget}]
+
+Outputs:
+  Endpoint:
+    Description: Public URL (frontend; /v1 and /actuator are routed to the backend service)
+    Value: !Sub 'http://${Alb.DNSName}'
+  ClusterName: {Value: !Ref Cluster}
+  TaskSecurityGroup: {Value: !Ref TaskSecurity}
+  TaskSubnets: {Value: !Join [',', !Ref Subnets]}
+  ExecutionRoleArn:
+    Value: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+  BackendTaskRoleArn:
+    Value: !If
+      - CreateRole
+      - !GetAtt BackendTaskRole.Arn
+      - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+  FrontendTaskRoleArn:
+    Value: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole'
+  DBEndpoint: {Value: !GetAtt Database.Endpoint.Address}
+  DBPort: {Value: !GetAtt Database.Endpoint.Port}
+  DBName: {Value: db_biztrips}
+  DBSecretArn: {Value: !Ref DbSecret}
+  PhotoBucket: {Value: !Ref PhotoBucket}
+  PhotoPrefix: {Value: !Ref PhotoPrefix}
+  BackendEcr: {Value: !GetAtt BackendEcr.RepositoryUri}
+  FrontendEcr: {Value: !GetAtt FrontendEcr.RepositoryUri}
+  BackendTarget: {Value: !Ref BackendTarget}
+  FrontendTarget: {Value: !Ref FrontendTarget}
+  LogGroup: {Value: !Ref Logs}
