@@ -14,22 +14,22 @@ Live: <http://bbw-m324-refcard05-1247198490.us-east-1.elb.amazonaws.com> (läuft
 
 ```mermaid
 flowchart LR
-  dev[Push / Tag vX.Y.Z] --> ghaB[GitHub Actions<br/>Backend-Pipeline]
-  dev --> ghaF[GitHub Actions<br/>Frontend-Pipeline]
-  ghaB -->|Image 5.0.2| ecrB[(ECR<br/>refcard05-backend)]
-  ghaF -->|Image 5.0.2| ecrF[(ECR<br/>refcard05-frontend)]
-  ghaB -->|neue Task-Definition| svcB
-  ghaF -->|neue Task-Definition| svcF
-  user((Browser)) --> alb[Application Load Balancer]
-  subgraph ECS Fargate · Cluster bbw-m324-refcard05
-    svcF[Service biztrips-frontend<br/>nginx]
-    svcB[Service biztrips-backend<br/>Spring Boot]
+  dev["Push / Tag vX.Y.Z"] --> ghaB["GitHub Actions<br/>Backend-Pipeline"]
+  dev --> ghaF["GitHub Actions<br/>Frontend-Pipeline"]
+  ghaB -->|"Image 5.0.2"| ecrB[("ECR<br/>refcard05-backend")]
+  ghaF -->|"Image 5.0.2"| ecrF[("ECR<br/>refcard05-frontend")]
+  ghaB -->|"neue Task-Definition"| svcB
+  ghaF -->|"neue Task-Definition"| svcF
+  user(("Browser")) --> alb["Application Load Balancer"]
+  subgraph ecs["ECS Fargate · Cluster bbw-m324-refcard05"]
+    svcF["Service biztrips-frontend<br/>nginx"]
+    svcB["Service biztrips-backend<br/>Spring Boot"]
   end
-  alb -->|/| svcF
-  alb -->|/v1/*, /actuator/*| svcB
-  svcB -->|TLS verify-full| rds[(RDS MariaDB 11.8)]
-  svcB -->|Task-Rolle, nur employee-photos/*| s3[(S3 Bucket<br/>Fotos)]
-  sm[Secrets Manager] -.->|DB_USER, DB_PASSWORD| svcB
+  alb -->|"/"| svcF
+  alb -->|"/v1/*, /actuator/*"| svcB
+  svcB -->|"TLS verify-full"| rds[("RDS MariaDB 11.8")]
+  svcB -->|"Task-Rolle, nur employee-photos/*"| s3[("S3 Bucket<br/>Fotos")]
+  sm["Secrets Manager"] -.->|"DB_USER, DB_PASSWORD"| svcB
 ```
 
 Die gesamte AWS-Infrastruktur ist Code: [`deploy/infrastructure.yaml`](../deploy/infrastructure.yaml) (Stack `bbw-m324-refcard05`). Er enthält Security Groups (DB nur von den Tasks, Tasks nur vom ALB), RDS, Secret, S3-Bucket inklusive Policy, zwei ECR-Repositories mit Scan-on-Push und Lifecycle-Regeln, den ECS-Cluster, CloudWatch Logs und den ALB mit Pfad-Routing. Die ECS-Services und Task-Definitionen legt die Pipeline selbst an und aktualisiert sie.
